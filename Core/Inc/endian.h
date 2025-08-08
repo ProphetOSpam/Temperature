@@ -9,8 +9,9 @@
 #define INC_ENDIAN_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
 // Modifies data structure in place to become little endian
-void swpend(void *vdata, size_t size);
+void swpend(uint16_t *data, size_t size);
 
 #endif /* INC_ENDIAN_H_ */

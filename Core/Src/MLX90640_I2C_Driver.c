@@ -76,7 +76,8 @@ int MLX90640_I2CRead(uint8_t slaveAddr, uint16_t startAddress, uint16_t nMemAddr
 	// Fun fact it was not fine, gotta swap the endianness
 	unsigned amount_per_read = min(nMemAddressRead, MLX90640_I2C_AMOUNT_PER_READ);
 
-	for (int i = 0; i < nMemAddressRead; i += amount_per_read) {
+	uint16_t i;
+	for (i = 0; i < nMemAddressRead; i += amount_per_read) {
 		HAL_StatusTypeDef result = HAL_I2C_Mem_Read(
 				&hi2c3,
 				slaveAddr << 1,
@@ -93,9 +94,34 @@ int MLX90640_I2CRead(uint8_t slaveAddr, uint16_t startAddress, uint16_t nMemAddr
 		}
 
 		// MLX driver manual, section 2 sayeth: reverse that endianness
-		for (int j = i; j < i + amount_per_read; j++) {
-			swpend(data + j, sizeof(uint16_t));
+		swpend(data + i, amount_per_read);
+//		for (uint16_t j = i; j < i + amount_per_read; j++) {
+//			swpend(data + j, sizeof(uint16_t));
+//		}
+	}
+
+	uint16_t final_read_amount = nMemAddressRead - i;
+
+	if (final_read_amount > 0) {
+		HAL_StatusTypeDef result = HAL_I2C_Mem_Read(
+						&hi2c3,
+						slaveAddr << 1,
+						startAddress + i,
+						I2C_MEMADD_SIZE_16BIT,
+						(uint8_t *) (data + i),
+						final_read_amount * sizeof(uint16_t),
+						MLX90640_I2C_TIMEOUT_MS);
+
+		if (result != HAL_OK) {
+			println("I2C error code: %lu", hi2c3.ErrorCode);
+			return -1;
 		}
+
+		// MLX driver manual, section 2 sayeth: reverse that endianness
+		swpend(data + i, amount_per_read);
+//		for (uint16_t j = i; j < i + final_read_amount; j++) {
+//			swpend(data + j, sizeof(uint16_t));
+//		}
 	}
 
 	return 0;
