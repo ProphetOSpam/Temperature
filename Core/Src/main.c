@@ -30,6 +30,7 @@
 #include "color.h"
 #include "bit.h"
 #include "print.h"
+#include "endian.h"
 //#include "../../Drivers/BSP/Components/ili9341/ili9341.h"
 /* USER CODE END Includes */
 
@@ -132,6 +133,10 @@ int main(void)
   MX_TIM1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+//  int x = 0x1110;
+//  print_binary_pretty(x);
+//  swpend((uint16_t *) &x, 2);
+//  print_binary_pretty(x);
   /* USER CODE END 2 */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -721,15 +726,6 @@ void display_fill_block_perpindicular(RGB565 *displayImage, size_t block_address
 
 #define TA_SHIFT 8 // Default for open air
 
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	println("hello there!");
-	switch (GPIO_Pin) {
-		case A0_Pin:
-			MLX90640_I2CGeneralReset();
-	}
-}
-
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -756,11 +752,10 @@ void StartDefaultTask(void const * argument)
 		Error_Handler();
 	}
 
-
 	// https://github.com/melexis/mlx90640-library/blob/master/MLX90640%20driver.pdf
 	// MLX90640 Configuration
 	// 32x24 resulution, scale it by 10 for da display later
-	if (MLX90640_SetRefreshRate(MLX90640_SLAVE_ADDR, 0b010) != 0) {
+	if (MLX90640_SetRefreshRate(MLX90640_SLAVE_ADDR, 0b110) != 0) {
 		println("Error in MLX90640 configuration (refresh rate)");
 		Error_Handler();
 	}
@@ -779,14 +774,11 @@ void StartDefaultTask(void const * argument)
 		println("Warning in MLX90640 configuration (extract parameters)");
 	}
 
-	println("%d", params.kVdd);
-	println("%d", params.vdd25);
-
 	while (1) {
 		while (MLX90640_SynchFrame(MLX90640_SLAVE_ADDR) != 0) {};
 
 		uint16_t frameData[MLX90640_EEPROM_DUMP_NUM];
-		int result = MLX90640_GetFrameData(MLX90640_SLAVE_ADDR, frameData);
+		MLX90640_GetFrameData(MLX90640_SLAVE_ADDR, frameData);
 
 //		int pixel_count = MLX90640_PIXEL_NUM;
 ////		int pixel_count = 127; // How many seem to be working
@@ -795,7 +787,7 @@ void StartDefaultTask(void const * argument)
 //		for (int y = 0; y < 24; y++) {
 //			for (int x = 0; x < 32; x++) {
 //	//			RGB565 color = { .r = testData[i] };
-//				RGB565 color = { .val = testData[x + y * 32] };
+//				RGB565 color = { .val = testData[(31 - x) + y * 32] };
 //
 //				display_fill_block((RGB565 *) displayImage, x * 24 + y, 10, color);
 //			}
@@ -803,24 +795,25 @@ void StartDefaultTask(void const * argument)
 //
 		float ta = MLX90640_GetTa(frameData, &params);
 		float tr = ta - TA_SHIFT;
-		float emissivity = .9;
+		float emissivity = .95;
 
 		float temperature[MLX90640_PIXEL_NUM];
 		MLX90640_CalculateTo(frameData, &params, emissivity, tr, temperature);
 //
 //		float temperature[MLX90640_PIXEL_NUM];
-//		MLX90640_GetImage(frameData, &params, temperature);
+//		MLX90640_GetImage(frameData, &params, temperature); <-- This sucks balls
 
 		for (int y = 0; y < 24; y++) {
 			for (int x = 0; x < 32; x++) {
-				float value = temperature[x + y * 32]; // Number between 0 and 1
+				float value = temperature[(31 - x) + y * 32]; // Number between 0 and 1
 				int8_t ivalue = (int8_t) (value * BIT_MAX(5)); // Because there are 5 bits to a red
 
 
 				// For some reason temp < 0 means warm?
 				RGB565 color;
 				if (ivalue > 0) {
-					color = (RGB565){ .b = ivalue };
+//					color = (RGB565){ .b = ivalue };
+					color = (RGB565){}; // Testing to see if its more readable if only warm is displayed
 				} else {
 					color = (RGB565){ .r = -ivalue };
 				}
