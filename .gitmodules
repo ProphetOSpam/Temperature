@@ -1,0 +1,3 @@
+[submodule "Hardware/mlx90640-library"]
+	path = Hardware/mlx90640-library
+	url = https://github.com/melexis/mlx90640-library
